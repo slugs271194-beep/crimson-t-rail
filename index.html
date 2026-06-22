@@ -278,6 +278,19 @@ body{
 .qcard-btn-tally{background:linear-gradient(135deg,#7a30b0,#4a1078);border-color:rgba(180,140,220,0.4)}
 .qcard-progress-bar{width:100%;height:7px;border-radius:99px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:9px}
 .qcard-progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#7a30b0,#d4af80);transition:width .4s}
+.qcard-progress-label{font-size:11px;color:var(--mu);text-align:right;margin-top:4px}
+
+.proof-input-row{display:flex;gap:7px;margin-top:10px}
+.proof-input-row input{flex:1;padding:9px 11px;background:rgba(0,0,0,0.32);border:1px solid var(--bd);
+  border-radius:8px;color:var(--tx);font-size:12px;font-family:inherit}
+.proof-input-row input::placeholder{color:rgba(184,128,152,0.45)}
+.proof-submit-btn{padding:9px 13px;border-radius:8px;font-size:11.5px;white-space:nowrap;
+  background:linear-gradient(135deg,#7a30b0,#4a1078);border:1px solid rgba(180,140,220,0.4);color:var(--tx)}
+
+.proof-gallery{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.proof-thumb{width:61px;height:61px;border-radius:9px;object-fit:cover;border:1px solid rgba(255,255,255,0.15);
+  background:rgba(0,0,0,0.3);flex-shrink:0}
+.proof-thumb-error{opacity:0.25;filter:grayscale(1)}
 
 .spark-add-row{display:flex;gap:8px;margin-bottom:10px}
 .spark-add-row input{flex:1;padding:10px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--bd);
@@ -1117,7 +1130,7 @@ let state = {
   sparks:[], diary:[],
   log:'「見習魔女翻開了魔法書。故事，從今天開始。」',
   journeyProgress:0, journeyTarget:50000, journeyNotes:[], opportunityNotes:{},
-  hiddenQuests:[], customQuests:{}, questProgress:{},
+  hiddenQuests:[], customQuests:{}, questProgress:{}, questProofs:{}, questProofArchive:[],
   bountyReal:[], bountyVirtual:[], bountyHistory:[],
   wakeAnswers:[], wakeLastAsked:null, wakeSkipCount:0,
 };
@@ -1255,6 +1268,8 @@ function applyProfileToState(profile){
   state.hiddenQuests = gs.hiddenQuests || [];
   state.customQuests = gs.customQuests || {};
   state.questProgress = gs.questProgress || {};
+  state.questProofs = gs.questProofs || {};
+  state.questProofArchive = gs.questProofArchive || [];
   state.bountyReal = gs.bountyReal || [];
   state.bountyVirtual = gs.bountyVirtual || [];
   state.bountyHistory = gs.bountyHistory || [];
@@ -1279,6 +1294,7 @@ function saveProfile(immediate){
           wakeSkipCount: state.wakeSkipCount, todayId: state.todayId, todayDate: state.todayDate,
           journeyNotes: state.journeyNotes, history: state.history, opportunityNotes: state.opportunityNotes,
           hiddenQuests: state.hiddenQuests, customQuests: state.customQuests, questProgress: state.questProgress,
+          questProofs: state.questProofs, questProofArchive: state.questProofArchive,
           bountyReal: state.bountyReal, bountyVirtual: state.bountyVirtual, bountyHistory: state.bountyHistory
         }
       }).eq('id', state.player_id);
@@ -1588,14 +1604,26 @@ function renderQuestList(){
     const hasTarget = q.target && q.target > 1;
     const progress = state.questProgress && state.questProgress[q.id] || 0;
     const reached = hasTarget ? progress >= q.target : true;
+    const proofs = (state.questProofs && state.questProofs[q.id]) || [];
 
     let footBtn = '';
+    let proofInputRow = '';
+    let proofGallery = '';
+
     if(hasTarget){
-      // 次數型任務：不管之前是否完成過，只要進度未達標就持續顯示打卡按鈕
       if(reached){
         footBtn = `<button class="qcard-btn" data-qid="${q.id}">✦ 達標了，完成領獎</button>`;
       }else{
-        footBtn = `<button class="qcard-btn qcard-btn-tally" data-qid="${q.id}">+1　（${progress}/${q.target}）</button>`;
+        proofInputRow = `
+        <div class="proof-input-row">
+          <input type="text" class="proof-url-input" data-qid="${q.id}" placeholder="貼上這次成果的圖片網址...">
+          <button class="proof-submit-btn" data-qid="${q.id}">紀錄這次成果 +1</button>
+        </div>`;
+      }
+      if(proofs.length > 0){
+        proofGallery = `<div class="proof-gallery">${proofs.map((url,i)=>
+          `<img src="${url}" loading="lazy" class="proof-thumb" alt="成果${i+1}" onerror="this.classList.add('proof-thumb-error')">`
+        ).join('')}</div>`;
       }
     }else{
       footBtn = `<button class="qcard-btn ${done?'qcard-btn-redo':''}" data-qid="${q.id}">${done?'✓ 再做一次':'完成'}</button>`;
@@ -1607,7 +1635,10 @@ function renderQuestList(){
       <span class="qcard-sub">${q.sb}</span>
       <div class="qcard-name">${q.ic||''} ${q.n}</div>
       ${q.w ? `<div class="qcard-why">${q.w}</div>` : ''}
-      ${hasTarget ? `<div class="qcard-progress-bar"><div class="qcard-progress-fill" style="width:${Math.min(100,progress/q.target*100)}%"></div></div>` : ''}
+      ${hasTarget ? `<div class="qcard-progress-bar"><div class="qcard-progress-fill" style="width:${Math.min(100,progress/q.target*100)}%"></div></div>
+      <div class="qcard-progress-label">${progress} / ${q.target}</div>` : ''}
+      ${proofGallery}
+      ${proofInputRow}
       <div class="qcard-foot">
         <div class="qblock-pills">${rewardPills(q.r)}</div>
         ${footBtn}
@@ -1620,10 +1651,13 @@ function renderQuestList(){
   wrap.innerHTML = html;
 
   document.getElementById('custom-quest-add-btn').addEventListener('click', ()=> addCustomQuest(catKey));
-  wrap.querySelectorAll('.qcard-btn-tally').forEach(btn=>{
-    btn.addEventListener('click', ()=> tallyQuest(btn.dataset.qid));
+  wrap.querySelectorAll('.proof-submit-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> submitProof(btn.dataset.qid));
   });
-  wrap.querySelectorAll('.qcard-btn:not(.qcard-btn-tally)').forEach(btn=>{
+  wrap.querySelectorAll('.proof-url-input').forEach(input=>{
+    input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') submitProof(input.dataset.qid); });
+  });
+  wrap.querySelectorAll('.qcard-btn').forEach(btn=>{
     btn.addEventListener('click', ()=> completeQuest(btn.dataset.qid, false));
   });
   wrap.querySelectorAll('.qcard-del-btn').forEach(btn=>{
@@ -1635,15 +1669,25 @@ function renderQuestList(){
   });
 }
 
-function tallyQuest(qid){
+function submitProof(qid){
+  const input = document.querySelector(`.proof-url-input[data-qid="${qid}"]`);
+  if(!input) return;
+  const url = input.value.trim();
+  if(!url){ showToast('先貼上這次成果的圖片網址'); return; }
+
   if(!state.questProgress) state.questProgress = {};
+  if(!state.questProofs) state.questProofs = {};
+  if(!state.questProofs[qid]) state.questProofs[qid] = [];
+
+  state.questProofs[qid].push(url);
   state.questProgress[qid] = (state.questProgress[qid] || 0) + 1;
+
   const q = findQuest(qid);
   const target = q ? q.target : 1;
   if(state.questProgress[qid] >= target){
     showToast(`✦ 達標了！(${state.questProgress[qid]}/${target})　點下面領取獎勵`);
   }else{
-    showToast(`打卡 +1　(${state.questProgress[qid]}/${target})`);
+    showToast(`已記錄這次成果　(${state.questProgress[qid]}/${target})`);
   }
   saveProfile();
   renderQuestList();
@@ -1714,7 +1758,18 @@ function completeQuest(qid, isToday){
   if(!q) return;
   state.done[qid] = true;
   if(q.target && state.questProgress){
-    state.questProgress[qid] = 0; // 完成領獎後重置進度，下次重做要重新打卡
+    // 把這一輪的成果圖鑑保存進永久歷史，再清空目前進度供下次重做
+    if(!state.questProofArchive) state.questProofArchive = [];
+    const proofs = (state.questProofs && state.questProofs[qid]) || [];
+    if(proofs.length > 0){
+      state.questProofArchive.unshift({
+        questName: q.n, proofs: proofs.slice(),
+        completedDate: new Date().toLocaleDateString('zh-TW')
+      });
+      if(state.questProofArchive.length > 50) state.questProofArchive.length = 50;
+    }
+    state.questProgress[qid] = 0;
+    if(state.questProofs) state.questProofs[qid] = [];
   }
 
   const r = q.r || {};
