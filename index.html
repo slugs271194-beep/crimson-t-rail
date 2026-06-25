@@ -442,10 +442,16 @@ body{
 .bounty-wallet-card.real .bw-value{color:#ff7a95}
 .bounty-wallet-card.virtual .bw-value{color:var(--lav)}
 
-.bounty-card{position:relative;border-radius:14px;padding:14px 15px;margin-bottom:10px;
+.bounty-card{position:relative;border-radius:14px;padding:14px 15px 14px 38px;margin-bottom:10px;
   background:linear-gradient(155deg, rgba(255,255,255,0.07) 0%, rgba(80,30,45,0.3) 30%, rgba(28,14,20,0.4) 100%);
   border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(5px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.15)}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.15);
+  transition:box-shadow .2s}
+.bounty-card.dragging{opacity:0.55;box-shadow:0 8px 20px rgba(0,0,0,0.5);z-index:50}
+.bounty-drag-handle{position:absolute;left:0;top:0;bottom:0;width:32px;display:flex;align-items:center;
+  justify-content:center;font-size:18px;color:rgba(255,255,255,0.3);cursor:grab;touch-action:none;
+  letter-spacing:-2px;writing-mode:vertical-lr}
+.bounty-drag-handle:active{color:rgba(255,255,255,0.6);cursor:grabbing}
 .bounty-card.urgent{border-color:var(--red);background:linear-gradient(135deg,rgba(212,20,90,0.2),rgba(28,14,20,0.4));
   animation:bounty-pulse 1.8s ease-in-out infinite}
 @keyframes bounty-pulse{0%,100%{box-shadow:0 0 0 rgba(212,20,90,0)}50%{box-shadow:0 0 14px rgba(212,20,90,0.45)}}
@@ -458,7 +464,8 @@ body{
 .bounty-card-amount{font-size:19px;color:#ff7a95;font-weight:700;margin-top:6px}
 .bounty-card-deadline{font-size:12px;color:var(--mu);margin-top:4px}
 .bounty-card-deadline.urgent-text{color:var(--red);font-weight:700}
-.bounty-card-note{font-size:11.5px;color:var(--mu);margin-top:6px;font-style:italic;line-height:1.5}
+.bounty-card-note{font-size:11.5px;color:var(--mu);margin-top:6px;font-style:italic;line-height:1.6;
+  white-space:pre-wrap;word-break:break-word}
 .bounty-card-skill{font-size:10.5px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.06);color:var(--mu);
   display:inline-block;margin-top:8px}
 .bounty-card-btn{width:100%;margin-top:10px;padding:9px;border-radius:9px;font-size:13px;font-weight:600;
@@ -793,7 +800,7 @@ body{
   <!-- 新增懸賞表單彈窗 -->
   <div class="mbg" id="bounty-form-modal">
     <div class="mbox">
-      <div class="mbox-title">填入這個懸賞的細節</div>
+      <div class="mbox-title" id="bounty-form-title">填入這個懸賞的細節</div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <input type="text" id="bounty-form-name" class="login-input" style="text-align:left" placeholder="案子名稱（例如：插畫委託-小美）">
         <input type="number" id="bounty-form-amount" class="login-input" style="text-align:left" placeholder="預估金額（NT$）">
@@ -805,7 +812,7 @@ body{
           <option value="language">語言</option>
           <option value="spine">SPINE</option>
         </select>
-        <textarea id="bounty-form-note" class="wake-answer-input" placeholder="備註（選填）"></textarea>
+        <textarea id="bounty-form-note" class="wake-answer-input" style="min-height:140px" placeholder="備註（選填）—可以多行記錄案子細節、聯絡資訊、進度想法..."></textarea>
       </div>
       <button class="mbtn" id="bounty-form-submit">發布懸賞 ✦</button>
       <button class="timer-btn" id="bounty-form-cancel" style="margin-top:8px">取消</button>
@@ -2206,10 +2213,7 @@ function skillName(key){
 
 function renderBountyRealList(){
   const wrap = document.getElementById('bounty-real-list');
-  const list = state.bountyReal.slice().sort((a,b)=>{
-    const da = daysUntil(a.deadline), db = daysUntil(b.deadline);
-    return da - db; // 死線越近排越前面
-  });
+  const list = state.bountyReal; // 順序依照陣列本身，可被拖曳調整
   if(list.length === 0){
     wrap.innerHTML = `<div style="text-align:center;color:var(--mu);font-size:12.5px;padding:30px 0">還沒有真實案件——接到案子就把它加進來，讓進度看得見。</div>`;
     return;
@@ -2219,20 +2223,99 @@ function renderBountyRealList(){
     const urgent = dleft <= 2;
     const overdue = dleft < 0;
     return `
-    <div class="bounty-card ${urgent?'urgent':''}" data-bid="${b.id}">
+    <div class="bounty-card ${urgent?'urgent':''}" data-bid="${b.id}" draggable="true">
+      <div class="bounty-drag-handle" title="長按拖曳排序">⠿</div>
       <div class="bounty-card-top">
         <div class="bounty-card-name">${b.name}</div>
         <span class="bounty-card-status ${bountyStatusClass(b.status)}">${bountyStatusLabel(b.status)}</span>
       </div>
       <div class="bounty-card-amount">NT$ ${b.amount.toLocaleString()}</div>
       <div class="bounty-card-deadline ${urgent?'urgent-text':''}">${overdue?'⚠️ 已超過死線':'死線　'+b.deadline+'　（'+Math.ceil(dleft)+'天）'}</div>
-      ${b.note ? `<div class="bounty-card-note">📝 ${b.note}</div>` : ''}
+      ${b.note ? `<div class="bounty-card-note">📝 ${escapeHtml(b.note)}</div>` : ''}
       <span class="bounty-card-skill">主要練到：${skillName(b.skill)}</span>
-      <button class="bounty-card-btn" data-bid="${b.id}">查看 / 完工</button>
+      <button class="bounty-card-btn" data-bid="${b.id}">查看 / 編輯 / 完工</button>
     </div>`;
   }).join('');
   wrap.querySelectorAll('.bounty-card-btn').forEach(btn=>{
     btn.addEventListener('click', ()=> openBountyDetail(btn.dataset.bid, 'real'));
+  });
+  enableDragSort(wrap, state.bountyReal, ()=>{ saveProfile(); });
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML.replace(/\n/g, '<br>');
+}
+
+// ---------- 拖曳排序（支援觸控長按） ----------
+let _dragState = { dragEl:null, dragging:false, dataArray:null, onReorder:null, container:null };
+let _dragListenersBound = false;
+
+function bindGlobalDragListeners(){
+  if(_dragListenersBound) return;
+  _dragListenersBound = true;
+
+  function onMove(clientY){
+    const st = _dragState;
+    if(!st.dragging || !st.dragEl || !st.container) return;
+    const siblings = [...st.container.querySelectorAll('.bounty-card:not(.dragging)')];
+    let nextSibling = null;
+    for(const sib of siblings){
+      const box = sib.getBoundingClientRect();
+      const midpoint = box.top + box.height/2;
+      if(clientY < midpoint){ nextSibling = sib; break; }
+    }
+    if(nextSibling) st.container.insertBefore(st.dragEl, nextSibling);
+    else{
+      const lastCard = siblings[siblings.length-1];
+      if(lastCard) st.container.insertBefore(st.dragEl, lastCard.nextSibling);
+    }
+  }
+
+  function endDrag(){
+    const st = _dragState;
+    if(!st.dragging) return;
+    st.dragging = false;
+    document.body.style.overflow = '';
+    if(st.dragEl) st.dragEl.classList.remove('dragging');
+
+    if(st.container && st.dataArray){
+      const newOrder = [...st.container.querySelectorAll('.bounty-card')].map(c=>c.dataset.bid);
+      st.dataArray.sort((a,b)=> newOrder.indexOf(a.id) - newOrder.indexOf(b.id));
+      if(st.onReorder) st.onReorder();
+    }
+    st.dragEl = null; st.container = null; st.dataArray = null; st.onReorder = null;
+  }
+
+  window.addEventListener('mousemove', (e)=>{ if(_dragState.dragging) onMove(e.clientY); });
+  window.addEventListener('mouseup', endDrag);
+  window.addEventListener('touchmove', (e)=>{
+    if(_dragState.dragging){ e.preventDefault(); onMove(e.touches[0].clientY); }
+  }, {passive:false});
+  window.addEventListener('touchend', endDrag);
+}
+
+function enableDragSort(container, dataArray, onReorder){
+  bindGlobalDragListeners();
+  const cards = container.querySelectorAll('.bounty-card');
+
+  cards.forEach(card=>{
+    const handle = card.querySelector('.bounty-drag-handle');
+    if(!handle) return;
+
+    const startDrag = (clientY)=>{
+      _dragState.dragEl = card;
+      _dragState.dragging = true;
+      _dragState.dataArray = dataArray;
+      _dragState.onReorder = onReorder;
+      _dragState.container = container;
+      card.classList.add('dragging');
+      document.body.style.overflow = 'hidden';
+    };
+
+    handle.addEventListener('mousedown', (e)=>{ e.preventDefault(); startDrag(e.clientY); });
+    handle.addEventListener('touchstart', (e)=>{ startDrag(e.touches[0].clientY); }, {passive:true});
   });
 }
 
@@ -2246,12 +2329,13 @@ function renderBountyVirtualList(){
     const dleft = daysUntil(b.deadline);
     const overdue = dleft < 0;
     return `
-    <div class="bounty-card bounty-virtual-card" data-bid="${b.id}">
+    <div class="bounty-card bounty-virtual-card" data-bid="${b.id}" draggable="true">
+      <div class="bounty-drag-handle" title="長按拖曳排序">⠿</div>
       <div class="bounty-card-top">
         <div class="bounty-card-name">${b.name}</div>
         <span class="bounty-virtual-tag">虛擬</span>
       </div>
-      <div class="bounty-card-note" style="margin-top:6px">${b.desc}</div>
+      <div class="bounty-card-note" style="margin-top:6px">${escapeHtml(b.desc)}</div>
       <div class="bounty-card-deadline ${overdue?'urgent-text':''}">${overdue?'⚠️ 已逾期，誠實面對它':'死線　'+b.deadline}</div>
       <span class="bounty-card-skill">主要練到：${skillName(b.skill)}　·　✦${b.virtualPay} 自我實現</span>
       <button class="bounty-card-btn" data-bid="${b.id}">查看 / 完成</button>
@@ -2260,6 +2344,7 @@ function renderBountyVirtualList(){
   wrap.querySelectorAll('.bounty-card-btn').forEach(btn=>{
     btn.addEventListener('click', ()=> openBountyDetail(btn.dataset.bid, 'virtual'));
   });
+  enableDragSort(wrap, state.bountyVirtual, ()=>{ saveProfile(); });
 }
 
 function renderBountyHistoryList(){
@@ -2277,16 +2362,37 @@ function renderBountyHistoryList(){
     </div>`).join('');
 }
 
-// ---------- 新增懸賞表單 ----------
-function openBountyForm(){
-  document.getElementById('bounty-form-name').value = '';
-  document.getElementById('bounty-form-amount').value = '';
-  document.getElementById('bounty-form-deadline').value = '';
-  document.getElementById('bounty-form-skill').value = 'craft';
-  document.getElementById('bounty-form-note').value = '';
+// ---------- 新增/編輯懸賞表單 ----------
+let editingBountyId = null;
+
+function openBountyForm(editId){
+  editingBountyId = editId || null;
+  const titleEl = document.getElementById('bounty-form-title');
+  const submitBtn = document.getElementById('bounty-form-submit');
+
+  if(editId){
+    const b = state.bountyReal.find(x=>x.id===editId);
+    if(!b) return;
+    if(titleEl) titleEl.textContent = '編輯這個懸賞';
+    document.getElementById('bounty-form-name').value = b.name;
+    document.getElementById('bounty-form-amount').value = b.amount;
+    document.getElementById('bounty-form-deadline').value = b.deadline;
+    document.getElementById('bounty-form-skill').value = b.skill;
+    document.getElementById('bounty-form-note').value = b.note || '';
+    submitBtn.textContent = '儲存修改 ✦';
+  }else{
+    if(titleEl) titleEl.textContent = '填入這個懸賞的細節';
+    document.getElementById('bounty-form-name').value = '';
+    document.getElementById('bounty-form-amount').value = '';
+    document.getElementById('bounty-form-deadline').value = '';
+    document.getElementById('bounty-form-skill').value = 'craft';
+    document.getElementById('bounty-form-note').value = '';
+    submitBtn.textContent = '發布懸賞 ✦';
+  }
   document.getElementById('bounty-form-modal').classList.add('open');
 }
 function closeBountyForm(){
+  editingBountyId = null;
   document.getElementById('bounty-form-modal').classList.remove('open');
 }
 function submitBountyForm(){
@@ -2301,14 +2407,24 @@ function submitBountyForm(){
   if(!deadline){ showToast('選一下客戶死線'); return; }
 
   ensureBountyState();
-  state.bountyReal.push({
-    id: genBountyId('real'), name, amount, deadline, skill, note,
-    status:'progress', createdAt: Date.now()
-  });
+
+  if(editingBountyId){
+    const b = state.bountyReal.find(x=>x.id===editingBountyId);
+    if(b){
+      b.name = name; b.amount = amount; b.deadline = deadline; b.skill = skill; b.note = note;
+    }
+    showToast('已儲存修改');
+  }else{
+    state.bountyReal.push({
+      id: genBountyId('real'), name, amount, deadline, skill, note,
+      status:'progress', createdAt: Date.now()
+    });
+    showToast('懸賞已發布，去把它完成吧');
+  }
+  editingBountyId = null;
   closeBountyForm();
   saveProfile();
   renderBounty();
-  showToast('懸賞已發布，去把它完成吧');
 }
 
 // ---------- 虛擬委託 ----------
@@ -2347,7 +2463,7 @@ function openBountyDetail(bid, type){
       <div>金額：<b style="color:#ff7a95">NT$ ${b.amount.toLocaleString()}</b></div>
       <div style="margin-top:4px">死線：${b.deadline}（${dleft<0?'已超過':Math.ceil(dleft)+'天後'}）</div>
       <div style="margin-top:4px">主要技能：${skillName(b.skill)}</div>
-      ${b.note?`<div style="margin-top:8px;font-style:italic">${b.note}</div>`:''}
+      ${b.note?`<div style="margin-top:8px;font-style:italic;white-space:pre-wrap;line-height:1.6">${escapeHtml(b.note)}</div>`:''}
     `;
   }else{
     body = `
@@ -2361,6 +2477,7 @@ function openBountyDetail(bid, type){
   let actions = '';
   if(type === 'real'){
     actions += `<button class="mbtn" id="bounty-detail-complete">✦ 完工了，收到錢了</button>`;
+    actions += `<button class="timer-btn" id="bounty-detail-edit">✎ 編輯這個懸賞</button>`;
     actions += `<button class="timer-btn" id="bounty-detail-status-talking">標記為「談妥」</button>`;
     actions += `<button class="timer-btn" id="bounty-detail-status-waiting">標記為「待收款」</button>`;
   }else{
@@ -2374,6 +2491,10 @@ function openBountyDetail(bid, type){
   if(type==='real'){
     document.getElementById('bounty-detail-status-talking').onclick = ()=> setBountyStatus('talking');
     document.getElementById('bounty-detail-status-waiting').onclick = ()=> setBountyStatus('waiting');
+    document.getElementById('bounty-detail-edit').onclick = ()=>{
+      closeBountyDetail();
+      openBountyForm(bid);
+    };
   }
 
   document.getElementById('bounty-detail-modal').classList.add('open');
@@ -2446,7 +2567,7 @@ function bindBountyEvents(){
   document.getElementById('bounty-tab-real').addEventListener('click', ()=> switchBountyTab('real'));
   document.getElementById('bounty-tab-virtual').addEventListener('click', ()=> switchBountyTab('virtual'));
   document.getElementById('bounty-tab-history').addEventListener('click', ()=> switchBountyTab('history'));
-  document.getElementById('bounty-new-btn').addEventListener('click', openBountyForm);
+  document.getElementById('bounty-new-btn').addEventListener('click', ()=> openBountyForm());
   document.getElementById('bounty-virtual-new-btn').addEventListener('click', generateVirtualBounty);
   document.getElementById('bounty-form-submit').addEventListener('click', submitBountyForm);
   document.getElementById('bounty-form-cancel').addEventListener('click', closeBountyForm);
