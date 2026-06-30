@@ -570,6 +570,18 @@ body{
       <div class="bottle-shelf" id="home-bottle-shelf"></div>
       <div style="text-align:center;font-size:12px;color:var(--mu);font-style:italic;margin-bottom:14px">點瓶子看技能樹 ✦ 瓶滿可進化　·　點上方愛心進入心晶之樹</div>
 
+      <div class="calendar-box">
+        <div class="calendar-header">
+          <button class="cal-nav-btn" id="cal-prev-btn">‹</button>
+          <div class="calendar-title" id="cal-month-title"></div>
+          <button class="cal-nav-btn" id="cal-next-btn">›</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </div>
+
       <div class="qtop-blocks">
         <div class="qblock" id="home-week-block">
           <div class="qblock-tag">本週魔法課題</div>
@@ -661,19 +673,6 @@ body{
     <div class="wrap">
       <div class="bottle-shelf" id="bottle-shelf"></div>
       <div style="text-align:center;font-size:12px;color:var(--mu);font-style:italic;margin-bottom:14px">點瓶子看技能樹 ✦ 瓶滿可進化</div>
-
-      <div class="section-divider"><span>修 行 日 曆</span></div>
-      <div class="calendar-box">
-        <div class="calendar-header">
-          <button class="cal-nav-btn" id="cal-prev-btn">‹</button>
-          <div class="calendar-title" id="cal-month-title"></div>
-          <button class="cal-nav-btn" id="cal-next-btn">›</button>
-        </div>
-        <div class="calendar-weekdays">
-          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
-        </div>
-        <div class="calendar-grid" id="calendar-grid"></div>
-      </div>
 
       <div class="section-divider"><span>修 煉 任 務</span></div>
       <div class="ltabs" id="ltabs"></div>
@@ -1449,6 +1448,7 @@ function renderHome(){
   document.getElementById('home-xfill').style.width = levelProgress() + '%';
   renderWakeBox('home-wake-text');
   renderBottleShelf();
+  renderCalendar();
   renderTopBlocks();
 }
 
@@ -1979,7 +1979,6 @@ function renderHistory(){
 
 function renderQuestScreen(){
   renderBottleShelf();
-  renderCalendar();
   renderTopBlocks();
   renderLtabs();
   renderQuestList();
