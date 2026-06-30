@@ -413,6 +413,34 @@ body{
   background:linear-gradient(90deg,transparent,var(--gold2),var(--pink2),var(--gold2),transparent);opacity:.3}
 .section-divider span{position:relative;background:var(--bg);padding:0 12px;color:var(--gold2);font-size:13px;letter-spacing:4px;opacity:.6}
 
+/* ══════ 修行日曆 ══════ */
+.calendar-box{background:linear-gradient(155deg, rgba(255,255,255,0.06) 0%, rgba(80,30,45,0.28) 30%, rgba(28,14,20,0.4) 100%);
+  border:1px solid rgba(255,255,255,0.12);border-radius:15px;padding:14px;backdrop-filter:blur(5px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.15)}
+.calendar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cal-nav-btn{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
+  color:var(--tx);font-size:16px;display:flex;align-items:center;justify-content:center}
+.calendar-title{font-size:14px;color:var(--tx);font-weight:700;letter-spacing:1px}
+.calendar-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:6px}
+.calendar-weekdays span{font-size:10.5px;color:var(--mu)}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-day{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  border-radius:9px;font-size:12.5px;color:rgba(232,201,192,0.35);background:rgba(255,255,255,0.02);
+  cursor:default;transition:transform .15s}
+.cal-day.empty{visibility:hidden}
+.cal-day.today-marker{border:1px solid rgba(212,175,55,0.5)}
+.cal-day.has-activity{
+  color:#fff8e8;
+  font-weight:700;
+  background:radial-gradient(circle at 50% 35%, #ffb347 0%, #e8334f 55%, #82003a 100%);
+  box-shadow:0 0 10px rgba(255,150,60,0.65), 0 0 3px rgba(255,200,120,0.8) inset;
+  cursor:pointer;
+}
+.cal-day.has-activity:active{transform:scale(0.92)}
+.cal-day-dot{position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:#fff8e8;opacity:0.9}
+.cal-day-list-item{padding:10px 12px;background:rgba(0,0,0,0.25);border-radius:9px;font-size:12.5px;color:var(--tx);line-height:1.6}
+.cal-day-list-time{font-size:10.5px;color:var(--mu);margin-top:2px}
+
 /* ══════ 結晶質感卡片（共用） ══════ */
 .crystal-card{
   position:relative;
@@ -633,6 +661,19 @@ body{
     <div class="wrap">
       <div class="bottle-shelf" id="bottle-shelf"></div>
       <div style="text-align:center;font-size:12px;color:var(--mu);font-style:italic;margin-bottom:14px">點瓶子看技能樹 ✦ 瓶滿可進化</div>
+
+      <div class="section-divider"><span>修 行 日 曆</span></div>
+      <div class="calendar-box">
+        <div class="calendar-header">
+          <button class="cal-nav-btn" id="cal-prev-btn">‹</button>
+          <div class="calendar-title" id="cal-month-title"></div>
+          <button class="cal-nav-btn" id="cal-next-btn">›</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </div>
 
       <div class="section-divider"><span>修 煉 任 務</span></div>
       <div class="ltabs" id="ltabs"></div>
@@ -879,6 +920,15 @@ body{
       <textarea id="opp-note-textarea" class="wake-answer-input" style="min-height:120px;width:100%" placeholder="查到什麼、進度如何、卡在哪裡..."></textarea>
       <div style="text-align:right;font-size:12.5px;color:var(--mu);margin-top:4px;opacity:0.4;transition:opacity .3s" id="opp-note-saved-indicator">輸入時會自動儲存</div>
       <button class="mbtn" id="opp-note-close">完成 →</button>
+    </div>
+  </div>
+
+  <!-- 日曆 - 當天詳情彈窗 -->
+  <div class="mbg" id="cal-day-modal">
+    <div class="mbox">
+      <div class="mbox-title" id="cal-day-title"></div>
+      <div id="cal-day-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      <button class="mbtn" id="cal-day-close">關閉 →</button>
     </div>
   </div>
 
@@ -1143,7 +1193,7 @@ let state = {
   sparks:[], diary:[],
   log:'「見習魔女翻開了魔法書。故事，從今天開始。」',
   journeyProgress:0, journeyTarget:50000, journeyNotes:[], opportunityNotes:{},
-  hiddenQuests:[], customQuests:{}, questProgress:{}, questProofs:{}, questProofArchive:[], weekDone:{},
+  hiddenQuests:[], customQuests:{}, questProgress:{}, questProofs:{}, questProofArchive:[], weekDone:{}, calendarDays:{},
   bountyReal:[], bountyVirtual:[], bountyHistory:[],
   wakeAnswers:[], wakeLastAsked:null, wakeSkipCount:0,
 };
@@ -1284,6 +1334,7 @@ function applyProfileToState(profile){
   state.questProofs = gs.questProofs || {};
   state.questProofArchive = gs.questProofArchive || [];
   state.weekDone = gs.weekDone || {};
+  state.calendarDays = gs.calendarDays || {};
   state.bountyReal = gs.bountyReal || [];
   state.bountyVirtual = gs.bountyVirtual || [];
   state.bountyHistory = gs.bountyHistory || [];
@@ -1309,6 +1360,7 @@ function saveProfile(immediate){
           journeyNotes: state.journeyNotes, history: state.history, opportunityNotes: state.opportunityNotes,
           hiddenQuests: state.hiddenQuests, customQuests: state.customQuests, questProgress: state.questProgress,
           questProofs: state.questProofs, questProofArchive: state.questProofArchive, weekDone: state.weekDone,
+          calendarDays: state.calendarDays,
           bountyReal: state.bountyReal, bountyVirtual: state.bountyVirtual, bountyHistory: state.bountyHistory
         }
       }).eq('id', state.player_id);
@@ -1575,6 +1627,7 @@ function completeWeeklyQuest(weekIdx){
   renderTopBlocks();
   renderHome();
   renderHistory();
+  renderCalendar();
 }
 function renderTopBlocks(){
   renderTopBlocksWithPrefix('');
@@ -1797,6 +1850,7 @@ function toggleSpark(idx){
   saveProfile();
   renderQuestList();
   renderHome();
+  renderCalendar();
 }
 
 function completeQuest(qid, isToday){
@@ -1849,6 +1903,7 @@ function completeQuest(qid, isToday){
   renderGarden();
   renderHome();
   renderHistory();
+  renderCalendar();
   saveProfile();
 }
 
@@ -1892,12 +1947,24 @@ function saveDiary(){
 }
 
 // ---------- 完成歷紀 ----------
+function dateKeyOf(d){
+  d = d || new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+function recordToCalendar(text){
+  if(!state.calendarDays) state.calendarDays = {};
+  const key = dateKeyOf();
+  if(!state.calendarDays[key]) state.calendarDays[key] = [];
+  state.calendarDays[key].push({text, ts:Date.now()});
+}
+
 function pushHistory(text){
   if(!state.diary._history) state.diary._history = [];
   // 用單獨欄位存歷紀，跟日記分開（透過 sparks 結構外加一個 history 陣列在 state 上）
   if(!state.history) state.history = [];
   state.history.unshift({text, ts:Date.now()});
   if(state.history.length > 30) state.history.length = 30;
+  recordToCalendar(text);
 }
 function renderHistory(){
   const wrap = document.getElementById('history-list');
@@ -1912,6 +1979,7 @@ function renderHistory(){
 
 function renderQuestScreen(){
   renderBottleShelf();
+  renderCalendar();
   renderTopBlocks();
   renderLtabs();
   renderQuestList();
@@ -2289,6 +2357,75 @@ function escapeHtml(str){
   return div.innerHTML.replace(/\n/g, '<br>');
 }
 
+// ---------- 修行日曆 ----------
+let calViewYear, calViewMonth; // 0-indexed month
+
+function initCalendarView(){
+  const now = new Date();
+  calViewYear = now.getFullYear();
+  calViewMonth = now.getMonth();
+}
+
+function renderCalendar(){
+  if(calViewYear === undefined) initCalendarView();
+  if(!state.calendarDays) state.calendarDays = {};
+
+  const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  document.getElementById('cal-month-title').textContent = `${calViewYear} ${monthNames[calViewMonth]}`;
+
+  const firstDay = new Date(calViewYear, calViewMonth, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear()===calViewYear && today.getMonth()===calViewMonth;
+
+  const grid = document.getElementById('calendar-grid');
+  let html = '';
+  for(let i=0;i<startWeekday;i++){ html += `<div class="cal-day empty"></div>`; }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const key = `${calViewYear}-${calViewMonth+1}-${d}`;
+    const activities = state.calendarDays[key];
+    const hasActivity = activities && activities.length > 0;
+    const isToday = isCurrentMonth && d === today.getDate();
+    html += `<div class="cal-day ${hasActivity?'has-activity':''} ${isToday?'today-marker':''}" data-key="${key}" data-day="${d}">
+      ${d}${hasActivity ? '<span class="cal-day-dot"></span>' : ''}
+    </div>`;
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-day.has-activity').forEach(el=>{
+    el.addEventListener('click', ()=> openCalDayDetail(el.dataset.key, el.dataset.day));
+  });
+}
+
+function openCalDayDetail(key, day){
+  const activities = (state.calendarDays && state.calendarDays[key]) || [];
+  document.getElementById('cal-day-title').textContent = `${calViewMonth+1}月${day}日 做了這些事`;
+  const list = document.getElementById('cal-day-list');
+  if(activities.length === 0){
+    list.innerHTML = `<div style="text-align:center;color:var(--mu);font-size:12.5px;padding:10px 0">這天還沒有紀錄</div>`;
+  }else{
+    list.innerHTML = activities.map(a=>{
+      const time = new Date(a.ts).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+      return `<div class="cal-day-list-item">${escapeHtml(a.text)}<div class="cal-day-list-time">${time}</div></div>`;
+    }).join('');
+  }
+  document.getElementById('cal-day-modal').classList.add('open');
+}
+
+function calPrevMonth(){
+  calViewMonth--;
+  if(calViewMonth < 0){ calViewMonth = 11; calViewYear--; }
+  renderCalendar();
+}
+function calNextMonth(){
+  calViewMonth++;
+  if(calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
+  renderCalendar();
+}
+
 // ---------- 拖曳排序（支援觸控長按） ----------
 let _dragState = { dragEl:null, dragging:false, dataArray:null, onReorder:null, container:null };
 let _dragListenersBound = false;
@@ -2587,6 +2724,7 @@ function completeBounty(){
       completedDate: new Date().toLocaleDateString('zh-TW')
     });
     state.bountyReal.splice(idx,1);
+    recordToCalendar(`⚔️ 完工懸賞「${b.name}」NT$${b.amount.toLocaleString()}`);
     showToast(`✦ 完工！NT$${b.amount.toLocaleString()} 已計入遠行之約`);
   }else{
     state.bountyHistory.push({
@@ -2594,6 +2732,7 @@ function completeBounty(){
       completedDate: new Date().toLocaleDateString('zh-TW')
     });
     state.bountyVirtual.splice(idx,1);
+    recordToCalendar(`🌙 完成虛擬委託「${b.name}」`);
     showToast(`✦ 完成虛擬委託！+${b.virtualPay} 自我實現`);
   }
 
@@ -2662,6 +2801,9 @@ function bindNav(){
   document.getElementById('trial-close').addEventListener('click', ()=> document.getElementById('trial-modal').classList.remove('open'));
   document.getElementById('stuck-close').addEventListener('click', ()=> document.getElementById('stuck-modal').classList.remove('open'));
   document.getElementById('opp-note-close').addEventListener('click', closeOpportunityNoteModal);
+  document.getElementById('cal-prev-btn').addEventListener('click', calPrevMonth);
+  document.getElementById('cal-next-btn').addEventListener('click', calNextMonth);
+  document.getElementById('cal-day-close').addEventListener('click', ()=> document.getElementById('cal-day-modal').classList.remove('open'));
   document.getElementById('bounty-detail-modal').addEventListener('click', (e)=>{
     if(e.target.id === 'bounty-detail-modal') closeBountyDetail();
   });
